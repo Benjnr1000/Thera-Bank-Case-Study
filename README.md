@@ -1,26 +1,53 @@
-# Thera-Bank-Case-Study
+# Thera Bank Personal Loan Modeling
 
-This case is about a bank (Thera Bank) which has a growing customer base. Majority of these customers
-are liability customers (depositors) with varying size of deposits. The number of customers who are also
-borrowers (asset customers) is quite small, and the bank is interested in expanding this base rapidly to
-bring in more loan business and in the process, earn more through the interest on loans. In particular, the
-management wants to explore ways of converting its liability customers to personal loan customers (while
-retaining them as depositors). A campaign that the bank ran last year for liability customers showed a
-healthy conversion rate of over 9% success. This has encouraged the retail marketing department to devise
-campaigns with better target marketing to increase the success ratio with a minimal budget. The department
-wants to build a model that will help them identify the potential customers who have a higher probability
-of purchasing the loan. This will increase the success ratio while at the same time reduce the cost of the
-campaign. The dataset has data on 5000 customers. The data include customer demographic information
-(age, income, etc.), the customer’s relationship with the bank (mortgage, securities account, etc.), and the
-customer response to the last personal loan campaign (Personal Loan). Among these 5000 customers, only
-480 (= 9.6%) accepted the personal loan that was offered to them in the earlier campaign.
-As the consultant, I have a duty to build the best model which can classify the right customers who have a
-higher probability of purchasing the loan. In this project, I will be doing the following:
+A complete analytics and machine-learning workflow to help Thera Bank identify liability customers most likely to take a personal loan. This repository contains everything from data ingestion and EDA through customer segmentation and predictive modeling (CART & Random Forest).
 
-- EDA of the data available. Showcase the results using appropriate graphs
-- Apply appropriate clustering on the data and interpret the output (Thera Bank wants to understand
-what kind of customers exist in their database and hence we need to do customer segmentation)
-- Build appropriate models on both the test and train data (CART & Random Forest). Interpret all the
-model outputs and do the necessary modifications wherever eligible (such as pruning)
-- Check the performance of all the models that you have built (test and train). Use all the model
-performance measures you have learned so far. Share your remarks on which model performs the best.
+---
+
+## 📘 Project Overview
+
+Thera Bank has 5,000 deposit-only customers, of whom only 480 (9.6 %) converted to personal‐loan customers in a prior marketing campaign. Management wants to improve campaign ROI by targeting customers with a higher probability of converting. This project:
+
+1. **Explores** customer demographics, behavior, and product-holding data  
+2. **Segments** customers via K-Means clustering to understand major customer types  
+3. **Builds** two classification models (CART decision tree and Random Forest)  
+4. **Evaluates** and compares model performance (accuracy, recall, AUC, Gini, KS, concordance/discordance)  
+5. **Recommends** the best model for future targeted campaigns  
+
+---
+
+## 🗂️ Repository Structure
+
+- ├── data/
+- │ └── Thera_Bank_Personal_Loan_Modelling-dataset-1.xlsx # Raw customer dataset
+- │
+- ├── scripts/
+- │ ├── 01_eda.R # Exploratory Data Analysis & cleaning
+- │ ├── 02_clustering.R # K-Means customer segmentation
+- │ ├── 03_cart_model.R # CART model development & tuning
+- │ └── 04_random_forest.R # Random Forest model & evaluation
+- │
+- ├── reports/
+- │ ├── Thera-Bank-Project.Rmd # RMarkdown source
+- │ └── Thera-Bank-Project.pdf # Knit HTML/PDF report
+- │
+- ├── outputs/ # Generated plots, tables, model objects
+- │ ├── cluster_profiles.csv
+- │ ├── cart_tree.png
+- │ └── rf_variable_importance.png
+- │
+- ├── README.md # This file
+
+---
+
+## 🛠️ Setup & Dependencies
+
+1. **Install R** (≥ 4.0) and RStudio (recommended).  
+2. Install required R packages:
+   ```r
+   install.packages(c(
+     "readxl", "dplyr", "ggplot2", "corrplot", "cluster", "factoextra", "NbClust",
+     "caTools", "rpart", "rattle", "randomForest", "ROCR", "ineq", "InformationValue",
+     "DataExplorer", "mice", "knitr", "rmarkdown"
+   ))
+
