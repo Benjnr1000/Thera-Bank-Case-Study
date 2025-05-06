@@ -1,0 +1,1714 @@
+---
+title: "Thera Bank Case Study"
+author: "Benedict Egwuchukwu"
+date: "8/22/2020"
+output: 
+  pdf_document:
+    toc: TRUE
+    toc_depth: 4
+  html_document:
+    toc: TRUE
+    toc_depth: 4
+  word_document:
+    toc: TRUE
+    toc_depth: 4
+---
+
+## 1. Project Objective
+
+This case is about a bank (Thera Bank) which has a growing customer base. Majority of these customers are liability customers (depositors) with varying size of deposits. The number of customers who are also borrowers (asset customers) is quite small, and the bank is interested in expanding this base rapidly to bring in more loan business and in the process, earn more through the interest on loans. In particular, the management wants to explore ways of converting its liability customers to personal loan customers (while retaining them as depositors). A campaign that the bank ran last year for liability customers showed a healthy conversion rate of over 9% success. This has encouraged the retail marketing department to devise campaigns with better target marketing to increase the success ratio with a minimal budget. The department wants to build a model that will help them identify the potential customers who have a higher probability of purchasing the loan. This will increase the success ratio while at the same time reduce the cost of the campaign. The dataset has data on 5000 customers. The data include customer demographic information (age, income, etc.), the customer's relationship with the bank (mortgage, securities account, etc.), and the customer response to the last personal loan campaign (Personal Loan). Among these 5000 customers, only 480 (= 9.6%) accepted the personal loan that was offered to them in the earlier campaign.
+
+As the consultant, I have a duty to build the best model which can classify the right customers who have a higher probability of purchasing the loan. In this project, I will be doing the following:
+
+* EDA of the data available. Showcase the results using appropriate graphs
+* Apply appropriate clustering on the data and interpret the output (Thera Bank wants to understand what kind of customers exist in their database and hence we need to do customer segmentation)
+* Build appropriate models on both the test and train data (CART & Random Forest). Interpret all the model outputs and do the necessary modifications wherever eligible (such as pruning)
+* Check the performance of all the models that you have built (test and train). Use all the model performance measures you have learned so far. Share your remarks on which model performs the best.
+
+## 2. Assumptions
+
+The Random Forest model should be able to accurately classify the right customers who have a higher probability of puraching the loan for Thera Bank compared to the CART model.
+
+## 3. Exploratory Data Analysis (EDA) - Step by step approach
+
+``` {r echo=FALSE}
+#======================================================================= 
+# 
+# Exploratory Data Analysis - CardioGoodFitness 
+# 
+#=======================================================================
+```
+
+### 3.1 Environment Set up and Data Import
+
+#### 3.1.1 Install necessary packages and load libraries
+
+```{r, warning=FALSE, message=FALSE}
+# Environment set up and data import
+
+# Invoking libraries
+library(readxl) # To import excel files
+library(ggplot2) # To create plots
+library(corrplot) # To plot correlation plot between numerical variables
+library(dplyr) # To manipulate dataset
+library(gridExtra) # To plot multiple ggplot graphs in a grid
+library(DataExplorer) # visual exploration of data
+library(mice) # Multivariate Imputation via Chained Equations; takes care of uncertainty in missing values
+library(cluster)
+library(factoextra) # extract and visualize the results of multivariate data analysis
+library(NbClust) # to find optimal number of clusters
+library(caTools) # Split Data into Test and Train Set
+library(rpart) # To build CART decision tree
+library(rattle) # To visualise decision tree
+library(randomForest) # To build a Random Forest
+library(ROCR) # To visualise the performance classifiers
+library(ineq) # To calculate Gini
+library(InformationValue) # For Concordance-Discordance
+library(knitr) # Necessary to generate source codes from a .Rmd File
+library(markdown) # To convert to HTML
+library(rmarkdown) # To convret analyses into high quality documents
+```
+
+#### 3.1.2 Set up Working Directory
+
+```{r}
+# Set working directory 
+setwd("C:/Users/egwuc/Desktop/PGP-DSBA-UT Austin/Machine Learning/Week 5 - Project/")
+```
+
+#### 3.1.3 Import and Read the Dataset
+
+```{r,warning=FALSE, message=FALSE}
+# Read input file
+thera_bank <- read_excel("Thera Bank_Personal_Loan_Modelling-dataset-1.xlsx", sheet = 2)
+```
+
+#### 3.1.4 Global Options Settings
+
+```{r}
+# Global options settings
+options(scipen = 999) # turn off scientific notation like 1e+06
+```
+
+### 3.2 Variable Identification
+
+In order for us to get familiar with the Cardio Good Fitness data, we would be using the following functions to get an overview
+
+1. dim(): this gives us the dimension of the dataset provided. Knowing the data dimension gives us an idea of how large the data is. 2. head(): this shows the first 6 rows(observations) of the dataset. It is essential for us to get a glimpse of the dataset in a tabular format without revealing the entire dataset if we are to properly analyse the data. 
+3. tail(): this shows the last 6 rows(observations) of the dataset. Knowing what the dataset looks like at the end rows also helps us ensure the data is consistent. 
+4. str(): this shows us the structure of the dataset. It helps us determine the datatypes of the features and identify if there are datatype mismatches, so that we handle these ASAP to avoid inappropriate results from our analysis. 
+5. summary(): this provides statistical summaries of the dataset. This function is important as we can quickly get statistical summaries (mean,median, quartiles, min, frequencies/counts, max values etc.) which can help us derive insights even before diving deep into the data.
+6. View(): helps to look at the entire dataset at a glance.
+
+#### 3.2.1 Insight(s) from dim():
+
+```{r}
+# Check dimension of dataset 
+dim(thera_bank)
+```
+
+* The dataset has 5,000 rows and 14 columns.
+
+#### 3.2.2 Insight(s) from head() and tail():
+
+```{r}
+# Check first 6 rows(observations) of dataset
+head(thera_bank)
+tail(thera_bank)
+```
+
+* Values in all fields are consistent in each column.
+
+#### 3.2.3 Convert column names
+
+```{r}
+# Convert column names to appropriate column names
+colnames(thera_bank) <- c("ID", "Age", "Experience", "Income", "ZIP_Code", "Family_members", "CCAvg", "Education", "Mortgage",
+                          "Personal_Loan", "Securities_Account", "CD_Account", "Online", "CreditCard")
+```
+
+* Changed column names to appropriate names recognizable by rstudio.
+
+#### 3.2.4 Insight(s) from str():
+
+```{r}
+# Check structure of dataset
+str(thera_bank)
+```
+
+* Customer ID is an ID variable and not useful for predictive modelling.
+* Zip code is not useful as well for predictive modelling.
+* Personal loan is the response variable and is of numeric type. This should be a factor type.
+* Education, securities account, CD account, online and credit card should all ideally be ordered factor variables. However, they are numeric variables.
+* All the other vriables are numeric as they should be.
+
+#### 3.2.5 Convert to factor variable
+
+```{r}
+# Change personal_loan to factor variable
+thera_bank$Personal_Loan <- as.factor(thera_bank$Personal_Loan)
+```
+
+* Personal_loan is a factor variable and provides more meaning to the dataset.
+
+#### 3.2.6 Insight(s) from summary():
+
+```{r}
+# Get summary of dataset
+summary(thera_bank)
+```
+
+* Customer ID and zip code should be dropped.
+* The age variable ranges from 23 to 67 with a mean and median of 45.34 and 45.00 respectively.
+* The experience varible ranges from -3.0 to 43.0 years. Some customers have less than zero years of experience, bringing to
+  question its possibility. Could this be an error? 
+* The income variable is expressed in $'000 and reflects annual income. It ranges from 8,000 to 224,000.
+* The family members varaible is categorized from 1 through 4. The data contains 18 NA's that need to be treated. 
+* The CCAvg variable represents the average spending on credit cards per month, expressed in $'000. Ranges from 0 to 10,000.
+* The education variable represents the education level of customers and is categorized as 1: Undergrad; 2: Graduate; 
+  3: Advanced/Professional. The bank's customer base has more undergraduate students.
+* The mortgage variable represents customer's value of house mortgage if any and is expressed in $'000. Ranges from 0 to 635,000.
+* The personal loan varible represents customer response to the last personal loan campaign. Of the 5,000 customers, only 
+  480 (9.6%) accepted the personal loan that was offered in the earlier campaign.
+* Out of 5,000 customers, only 522 (10.4%) have securities account.
+* Out of 5,000 customers, only 302 (6.0%) have certificate of deposit (CD) account.
+* Out of 5,000 customers, 2,984 (59.7%) use the internet banking facilities.
+* Out of 5,000 customers, only 1,470 (29.4%) use a credit card issued by the bank.
+
+#### 3.2.7 Drop insignificant columns
+
+```{r}
+# Dropping ID and Zip Code column
+thera_bank <- thera_bank[, -1]
+thera_bank <- thera_bank[, -4]
+```
+
+* Removed the ID and Zip code column as it does not affect the analysis.
+
+#### 3.2.8 Insight(s) from View():
+
+```{r}
+# View the dataset 
+View(thera_bank)
+```
+
+* The dataset shows Thera Bank's growing customer base and gives detail of their customers. 
+
+### 3.3 Data Cleaning
+
+#### 3.3.1 Modifying Values
+
+```{r}
+# Filter out values less than 0 in Experience
+filter(thera_bank, Experience < 0)
+```
+
+```{r}
+# Replace values less than 0 in Experience with 0
+thera_bank$Experience <- replace(thera_bank$Experience, thera_bank$Experience<0, 0)
+```
+
+```{r}
+# Check if any values in less than 0 in Experience
+filter(thera_bank, Experience < 0)
+```
+
+#### 3.3.2 Missing Data Treatmemt
+
+```{r}
+# How many missing vaues do we have?
+sum(is.na(thera_bank)) 
+```
+
+```{r}
+# What columns contain missing values?
+colSums(is.na(thera_bank))
+```
+
+```{r}
+# Use functions and algorithms to impute the missing values
+data1 <- thera_bank
+sum(is.na(data1))
+md.pattern(data1)
+init.impute = mice(data1, m = 5, method = "pmm", seed = 1000)
+thera_bank = complete(init.impute, 2)
+md.pattern(thera_bank)
+sum(is.na(thera_bank))
+```
+
+### 3.4 Univariate Analysis
+
+```{r}
+# Distribution of the dependent variable
+prop.table(table(thera_bank$Personal_Loan))
+```
+
+* 9.6% of the customers are borrowers and we need to determine factors that suggest ways of converting liability customers to personal loadn customers to bring in more loan business and in the process, earn more through the interest on loans.
+* We will also build a model that will help them identify the potential customers who have a higher probability of purchasing the loan.
+
+```{r}
+plot_histogram_n_boxplot = function(variable, variableNameString, binw){
+  
+  a = ggplot(data = thera_bank, aes(x= variable)) +
+    labs(x = variableNameString,y ='count')+
+    geom_histogram(fill = 'green',col = 'white', binwidth = binw) +
+    geom_vline(aes(xintercept = mean(variable)),
+               color = "black", linetype = "dashed", size = 0.5)
+  
+  b = ggplot(data = thera_bank, aes('',variable))+ 
+    geom_boxplot(outlier.colour = 'red',col = 'red', outlier.shape = 19)+
+    labs(x = '', y = variableNameString) + coord_flip()
+  grid.arrange(a,b,ncol = 2)
+}
+```
+
+1. Observations on Age
+
+```{r}
+plot_histogram_n_boxplot(thera_bank$Age, 'Age', 2)
+```
+
+* There is a uniform distribution.
+
+2. Observations on Experience
+
+```{r}
+plot_histogram_n_boxplot(thera_bank$Experience, 'Experience', 2)
+```
+
+* There is a uniform distribution.
+
+3. Observations on Income
+
+```{r}
+plot_histogram_n_boxplot(thera_bank$Income, 'Income', 10)
+```
+
+* The distribution is skewed to the right.
+* There are however outliers towards the right, indicating that the bank has few customers with a higher level of income loans can be directed at.
+
+4. Observations on Family Members
+
+```{r}
+plot_histogram_n_boxplot(thera_bank$Family_members, 'Family Members', 1)
+```
+
+* There is a uniform distribution.
+* The minimum and maximum number of family members each customer have is 1 and 4 respectively.
+
+5. Observations on CCAvg
+
+```{r}
+plot_histogram_n_boxplot(thera_bank$CCAvg, 'CCAvg', 1)
+```
+
+* The distribution is skewed to the right.
+* There are a few number of outliers in the bank's customer base indicating individuals subsceptible to the loan program is limited.
+
+6. Observations on Education
+
+```{r}
+plot_histogram_n_boxplot(thera_bank$Education, 'Education', 1)
+```
+
+* This is a uniform distribution.
+* Undergraduates make-up the greater part of the bank's customer base. Trailing, is the advanced/professional 
+  individuals and graduates respectively.
+
+7. Observations on Mortgage
+
+```{r}
+plot_histogram_n_boxplot(thera_bank$Mortgage, 'Mortgage', 100)
+```
+
+* The distribution is skewed to the right.
+* The greater part of the bank's customer base have no mortgage indicating their lack of need for funding or financing.
+* However, there are a few outliers which the loan program could be targeted at.
+
+8. Observations on Securities Account
+
+```{r}
+plot_histogram_n_boxplot(thera_bank$Securities_Account, 'Securities Account', 1)
+```
+
+9. Observations on CD Account
+
+```{r}
+plot_histogram_n_boxplot(thera_bank$CD_Account, 'CD Account', 1)
+```
+
+10. Observations on Online
+
+```{r}
+plot_histogram_n_boxplot(thera_bank$Online, 'Online', 1)
+```
+
+11. Observations on Credit Card
+
+```{r}
+plot_histogram_n_boxplot(thera_bank$CreditCard, 'Credit Card', 1)
+```
+
+### 3.5 Bivariate Analysis
+
+#### 3.5.1 Bivariate Stacked Barchart
+
+Let us plot percent stacked barchart to see the effect of independent variables
+on the probability of personal loan
+
+```{r}
+# Function to draw percent stacked barchart to see the effect of independent variables
+# on the probability of personal loan using ggplot
+plot_stacked_barchart = function(variable, variableNameString){
+  ggplot(thera_bank, aes(fill = Personal_Loan, x = variable)) + 
+    geom_bar(position="fill")+
+    labs(title = variableNameString, y = '', x = '')+
+    scale_fill_manual(values=c("#0073C2FF", "#EFC000FF"))
+        
+}
+```
+
+1. Personal loan vs Age
+```{r}
+plot_stacked_barchart(thera_bank$Age, 'Age')
+```
+
+* Customers in the age range of 26 - 65 took a loan in the last campaign.
+
+2. Personal loan vs Experience
+```{r}
+plot_stacked_barchart(thera_bank$Experience, 'Experience')
+```
+
+* Customers with or without professional experience took a loan in the last campaign. 
+
+3. Personal loan vs Income
+```{r}
+plot_stacked_barchart(thera_bank$Income, 'Income')
+```
+
+* In the last campaign, customers who earned more were likely to take a loan.
+
+4. Personal loan vs Family members
+```{r}
+plot_stacked_barchart(thera_bank$Family_members, 'Family Members')
+```
+
+* There is little difference in family members and personal loan. However, customers with 3 or more family members have a higher tendency to take a loan. 
+
+5. Personal loan vs Education
+```{r}
+plot_stacked_barchart(thera_bank$Education, 'Education')
+```
+
+* Customers with a higher level of education have a higher tendency to take a loan.
+
+6. Personal loan vs Securities Account
+```{r}
+plot_stacked_barchart(thera_bank$Securities_Account, 'Securities Account')
+```
+
+* There is little or no difference between customers who have securities account and who took a personal loan.
+
+7. Personal loan vs CD Account
+```{r}
+plot_stacked_barchart(thera_bank$CD_Account, 'CD Account')
+```
+
+* Customers with a CD account have a higher tendency to take a loan.
+
+8. Personal loan vs Online
+```{r}
+plot_stacked_barchart(thera_bank$Online, 'Online')
+```
+
+* There is little or no difference between customers who shop online and who took a personal loan.
+
+9. Personal loan vs Credit Card
+```{r}
+plot_stacked_barchart(thera_bank$CreditCard, 'Credit Card')
+```
+
+* There is little or no difference between customers who have credit card and who took a personal loan.
+
+#### 3.5.2 Correlation Plot between Numerical Variables
+
+Plot bivariate charts between variables to understand their relationship with each other.
+
+Check for correlation among numerical variables
+
+```{r}
+# Numeric variables in the data
+num_vars = sapply(thera_bank, is.numeric)
+
+# Correlation Plot
+corrplot(cor(thera_bank[,num_vars]), method = 'number')
+```
+
+* There is a high correlation between age and experience, which is understandable. 
+* There is a moderate correlation between CCAvg and Income, suggesting that customer's level of income to an extent influence
+  credit card spending pattern. 
+
+## 4. Data Modelling: Cluster Analysis
+
+### 4.1 K-Means Clustering
+
+For this problem statement, we choose to use K-Means clustering because of the following:
+
+* First, the number of observations is large (5000), which will be computationally huge with Hierarchical clustering as it computes pairwise distance between every points of data. This is because the time complexity of K Means is linear i.e. O(n) while that of hierarchical clustering is quadratic i.e. O(n2), taking a quadratic amount if time. 
+* K-Means is found to work well when the shape of the clusters is spherical (like circle in 2D, sphere in 3D) and specifically when the dataset is huge.
+
+```{r}
+# Scale the dataset to reduce the influence from variables with high values
+data <- thera_bank
+
+# Change Family_members, Education, Securities_Account, CD_Account, Online and CreditCard to factor variable
+thera_bank$Family_members <- as.factor(thera_bank$Family_members)
+thera_bank$Education <- as.factor(thera_bank$Education)
+thera_bank$Securities_Account <- as.factor(thera_bank$Securities_Account)
+thera_bank$CD_Account <- as.factor(thera_bank$CD_Account)
+thera_bank$Online <- as.factor(thera_bank$Online)
+thera_bank$CreditCard <- as.factor(thera_bank$CreditCard)
+
+str(data)
+view(data)
+
+thera_bank.scaled <- scale(data[, -c(4, 6, 8, 9, 10, 11, 12)])
+```
+
+```{r}
+# Determine the optimum number of clusters (find optimal k)
+seed <- 1000
+set.seed(seed) # kmeans uses a randomized starting point for cluster centroids
+clust2 = kmeans(thera_bank.scaled, centers = 2, nstart = 5)
+print(clust2)
+```
+
+```{r}
+# Visualise the cluster
+clusplot(thera_bank.scaled, clust2$cluster, 
+         color=TRUE, shade=TRUE, labels=2, lines=1)
+```
+
+```{r}
+# Create clusters for k=3, k=4 and k=5 for comparative analysis
+clust3 <- kmeans(thera_bank.scaled, centers = 3, nstart = 5)
+clust4 <- kmeans(thera_bank.scaled, centers = 4, nstart = 5)
+clust5 <- kmeans(thera_bank.scaled, centers = 5, nstart = 5)
+```
+
+```{r}
+# Visualise clusters in 2 dimensions
+k_clust_viz_2 = fviz_cluster(list(data = thera_bank.scaled,
+                                  cluster = clust2$cluster)) + 
+  ggtitle("k = 2")
+k_clust_viz_3 = fviz_cluster(list(data = thera_bank.scaled,
+                                  cluster = clust3$cluster)) + 
+  ggtitle("k = 3")
+k_clust_viz_4 = fviz_cluster(list(data = thera_bank.scaled,
+                                  cluster = clust4$cluster)) + 
+  ggtitle("k = 4")
+k_clust_viz_5 = fviz_cluster(list(data = thera_bank.scaled,
+                                  cluster = clust5$cluster)) + 
+  ggtitle("k = 5")
+```
+
+```{r}
+# Visualise all 4 clustering plots together
+grid.arrange(k_clust_viz_2, k_clust_viz_3, k_clust_viz_4, k_clust_viz_5, nrow = 2)
+```
+
+* To identify the optimal number of clusters, we can use the elbow algorithm method.
+
+```{r}
+# To find the optimal numbner of clusters. Lets try K = 1 to 5 and for each plot the "sum of Within cluster sum of squares".
+totWss <- rep(0,5)
+for(k in 1:5){
+  set.seed(seed)
+  clust <- kmeans(thera_bank.scaled, centers = k, nstart = 5)
+  totWss[k] <- clust$tot.withinss
+}
+print(totWss)
+plot(c(1:5), totWss, type="b", xlab="Number of Clusters",
+       ylab="sum of 'Within groups sum of squares'")
+```
+
+* K = 3 might be a good choice using the elbow argument. 
+* "NbClust" is another package that the best clustering scheme using a number of experiments on the given data.
+
+```{r, results='hide',fig.keep='none', warning=FALSE,message=FALSE,error=FALSE}
+set.seed(seed) 
+nc <- NbClust(thera_bank.scaled, min.nc = 2, max.nc = 5, method="kmeans")
+```
+
+```{r}
+table(nc$Best.n[1,])
+```
+
+* Accordingly, NbClust suggests strongly that K = 3 would be the best choice.
+
+```{r}
+# Adding the cluster numbers back to the dataset
+data$Clusters = clust3$cluster
+```
+
+```{r}
+# Aggregate all columns except column 8 for each cluster by their means
+custProfile = aggregate(data[, -c(4, 6, 8, 9, 10, 11, 12)],list(data$Cluster),FUN="mean")
+print(custProfile)
+```
+
+* Insights ----------------------------------------------------------------
+
+* For clusters = 3, k-means demarcates the Thera bank's customer base into three tiers.
+
+* K = 3 gives 3 clusters, out of which cluster 1 comprises of a high Income, CCAvg and Mortgage as well as mid-age and professional experience of 19. While cluster 2 and 3 customer base follows in that order in terms of income and CCAvg. However, there is a marginal difference in Mortgage for cluster 2 and 3.
+
+* If we consider only 2 clusters we'll have a cluster of customers likely to take a loan and not likely to take a loan.
+
+* A k = 4 would likely have given two high income groups and two low income groups
+
+* We will use k = 3 cluster for deriving business insights. 
+
+## 5. Build CART to classify the right customers who have a higher probability of purchasing the loan
+
+### 5.1 Model Building - Approach
+
+1. Partition the data into train and test set.
+2. Built a CART model on the train data.
+2.1. Tune the model and prune the tree, if required.
+2.2. Test the model on test set.
+
+### 5.2 Split into train and test
+
+```{r}
+set.seed(seed) # To ensure reproducibility
+split <- sample.split(thera_bank$Personal_Loan, SplitRatio = 0.7)
+train <- subset(thera_bank, split == TRUE)
+test <- subset(thera_bank, split == FALSE)
+
+nrow(train)
+nrow(test)
+
+# Check that the distribution of the dependent variable is similar in train and test sets
+prop.table(table(thera_bank$Personal_Loan))
+prop.table(table(thera_bank$Personal_Loan))
+prop.table(table(thera_bank$Personal_Loan))
+```
+
+### 5.3 Build a CART model on the train dataset
+
+```{r}
+# Setting the control parameters (to control the growth of the tree)
+# Set the control parameters very low to let the tree grow deep
+
+r.ctrl = rpart.control(minsplit = 50, minbucket = 10, cp = 0, xval = 10)
+
+# Building the CART model
+
+# formula - response variable~predictor variables  
+# data - dataset
+# method - "class" - for classification, "anova" for regression
+# control - tree control parameters
+
+model1 <- rpart(formula = Personal_Loan ~ ., data = train, method = "class", control = r.ctrl)
+model1
+```
+
+### 5.4 Visualise the decision tree on Model1
+
+```{r}
+# Displaying the decision tree
+fancyRpartPlot(model1)
+```
+
+* We can still prune this tree.
+
+### 5.5 Model Tuning
+
+```{r}
+# The cost complexity table can be obtained using the printcp or plotcp functions
+printcp(model1)
+plotcp(model1)
+```
+
+* The complex tree above can be pruned using a cost complexity threshold. Using a complexity threshold of 0.021 gives us a relatively simpler tree.
+
+#### 5.5.1 Build a CART model for Model2
+
+```{r}
+model2 = prune(model1, cp= 0.021, "CP")
+printcp(model2)
+model2
+```
+
+Variables actually used in tree construction:
+* Income         
+* Family members  
+* Education           
+
+#### 5.5.2 Visualise the decision tree on Model2
+
+```{r}
+#Displaying the decision tree
+fancyRpartPlot(model2)
+```
+
+* Employees who do not have Income < 115 and whose education level is not less than 1.5 have a 98%.
+
+### 5.6 Variable importance on Model1
+
+```{r}
+# Variable importance is generally computed based on the corresponding reduction of predictive accuracy 
+# when the predictor of interest is removed.
+model1$variable.importance
+```
+
+### 5.6 Variable importance on Model2
+
+```{r}
+# Variable importance is generally computed based on the corresponding reduction of predictive accuracy 
+# when the predictor of interest is removed.
+model2$variable.importance
+```
+
+* Variable importance is the same for both models.
+
+### 5.7 Model Validation on Model1
+
+```{r}
+# Predicting on the train dataset
+train_predict.class1 <- predict(model1, train, type="class") # Predicted Classes
+train_predict.score1 <- predict(model1, train) # Predicted Probabilities
+
+# Create confusion matrix for train data predictions
+tab.train1 = table(train$Personal_Loan, train_predict.class1)
+tab.train1
+
+# Accuracy on train data
+accuracy.train1 = sum(diag(tab.train1)) / sum(tab.train1)
+accuracy.train1
+```
+
+CART Model (model1) has 98.6% accuracy on train data. 
+Baseline accuracy is 90.4%
+The model is an improvement on the baseline by 8.2% but let us see if we can improve it furthur using Random Forest Model. 
+
+Let us first see how the models performs on the test data 
+
+### 5.8 Model Validation on Model2
+
+```{r}
+# Predicting on the train dataset
+train_predict.class2 <- predict(model2, train, type="class") # Predicted Classes
+train_predict.score2 <- predict(model2, train) # Predicted Probabilities
+
+# Create confusion matrix for train data predictions
+tab.train2 = table(train$Personal_Loan, train_predict.class2)
+tab.train2
+
+# Accuracy on train data
+accuracy.train2 = sum(diag(tab.train2)) / sum(tab.train2)
+accuracy.train2
+```
+
+CART Model (model2) has 98.2% accuracy on train data. 
+Baseline accuracy is 90.4%
+The model is an improvement on the baseline by 7.8%, down 0.4% from model1. 
+
+### 5.9 Model Evaluation
+
+#### 5.9.1 MODEL 1
+
+```{r}
+# Predicting on the test dataset using MODEL 1
+test_predict.class1 <- predict(model1, test, type="class") # Predicted Classes
+test_predict.score1 <- predict(model1, test) # Predicted Probabilities
+
+# Create confusion matrix for test data predictions (using MODEL 1)
+tab.test1 = table(test$Personal_Loan, test_predict.class1)
+tab.test1
+
+# Accuracy on train data (MODEL 1 predictions)
+accuracy.test1 = sum(diag(tab.test1)) / sum(tab.test1)
+accuracy.test1
+```
+
+#### 5.9.2 MODEL 2
+
+```{r}
+# Predicting on the test dataset using MODEL 2
+test_predict.class2 <- predict(model2, test, type="class") # Predicted Classes
+test_predict.score2 <- predict(model2, test) # Predicted Probabilities
+
+# Create confusion matrix for test data predictions (using MODEL 2)
+tab.test2 = table(test$Personal_Loan, test_predict.class2)
+tab.test2
+
+# Accuracy on train data (MODEL 2 predictions)
+accuracy.test2 = sum(diag(tab.test2)) / sum(tab.test2)
+accuracy.test2
+```
+
+### 5.10 Comparing Models
+ 
+```{r}
+Model_Name = c("Baseline", "Model1", "Model2")
+Train_Accuracy_perc = c(90, accuracy.train1*100, accuracy.train2*100)
+Test_Accuracy_perc = c(90, accuracy.test1*100, accuracy.test2*100)
+output = data.frame(Model_Name,Train_Accuracy_perc,Test_Accuracy_perc)
+output
+```
+
+### 5.11 Conclusion
+
+* Model1 performs very well both on the test and train data.
+* We will use model1 as the final model.
+
+* Model1 Decision Tree has more accuracy than baseline model.
+
+* Accuracy on the Training Data: 98.6%.
+* Accuracy on the Test Data: 97.9%.
+
+* Accuracy for test data is almost inline with training data.
+* This tells that the model is neither underfit nor overfit.
+
+## 6. Build a Random Forest Model to classify the right customers who have a higher probability of purchasing the loan
+
+### 6.1 Random Forest Approach
+
+1. Build a Random Forest model on the train set
+2.1 Tune the model
+2.2 Test the model performance on test set.
+3. Compare the performance of the two models and pick the best model as your final model
+
+### 6.2 Build the first RF model
+
+```{r}
+set.seed(seed)
+# Formula - response variable ~ predictor variables
+# To build a classification random forest the response variable should be converted to a factor if it isn't already a factor
+# data -  dataset to train the model on
+## Random Forest hyperparameters
+# ntree - Total number of trees are to be constructed
+# mtry - number of variables tried at each split
+# importance - Set TRUE to assess variable importance
+
+rf_model1 = randomForest(
+  Personal_Loan ~ .,
+  data = train,
+  ntree = 501,
+  mtry = 5,
+  nodesize = 10,
+  importance = TRUE
+  )
+```
+
+Print the model to see the OOB and error rate
+
+Out-of-bag refers to a scenario when the combined prediction from a set of trees is used to predict the dependent variable for all those sample not used to build these trees (hence the name out-of-bag). 
+
+```{r}
+print(rf_model1)
+```
+
+Plot the model to determine the optimum number of trees
+
+```{r}
+plot(rf_model1, main="")
+legend("topright", c("OOB", "0", "1"), text.col=1:6, lty=1:3, col=1:3)
+title(main="Error Rates Random Forest Thera_Bank")
+```
+
+* The plot reveals that anything more than, say 50 trees, is really not that valuable.
+
+List the importance of the variables. Larger the MeanDecrease values, the more important the variable. Look at the help files to get a better sense of how these are computed.
+
+```{r}
+importance(rf_model1)
+```
+
+The variables important include:
+* Education
+* Income
+* Family_members
+* CCAVG
+
+### 6.3 Tune the Random Forest Model
+
+Let us tune the randomforest model by trying different m values
+Tune the RF model to find out the best mtry
+We will take ntree = 51 (odd number of trees are preferred)
+The returned forest, rf_model2 is the one corresponding to the best m
+
+```{r}
+# Check the column number of the response variable
+names(train)
+
+set.seed(seed) # To ensure reproducibility
+
+rf_model2 = tuneRF(x = train[, -8], # matrix or data frame of predictor/independent variables
+                  y = train$Personal_Loan, # response vector (factor for classification, numeric for regression)
+                  mtrystart = 5, # starting value of mtry
+                  stepfactor=1.5, # at each iteration, mtry is inflated (or deflated) by this value
+                  ntree=51, # number of trees built for each mtry value
+                  improve=0.0001, # the (relative) improvement in OOB error must be by this much for the search to continue
+                  nodesize=10, # Minimum size of terminal nodes
+                  trace=TRUE, # prints the progress of the search
+                  plot=TRUE, # to get the plot of the OOB error as function of mtr
+                  doBest=TRUE, # return a forest using the optimal mtry found
+                  importance=TRUE # 
+                  )
+```
+
+* The optimal number of mtry is 6.
+* tuneRF returns rf_model2. It is the random forest of 51 trees built with m = 6.
+
+### 6.4 Model Validation
+
+```{r}
+# Predicting on the train dataset
+train_predict.class_RF <- predict(rf_model2, train, type = "class") # Predicted Classes
+train_predict.score_RF <- predict(rf_model2, train, type = 'prob') # Predicted Probabilities
+
+# Create confusion matrix for train data predictions
+tab.train_RF = table(train$Personal_Loan, train_predict.class_RF)
+tab.train_RF
+
+# Accuracy on train data
+accuracy.train_RF = sum(diag(tab.train_RF)) / sum(tab.train_RF)
+accuracy.train_RF
+```
+
+* RandomForest mode (rf_model2) has 99.3% accuracy on train data. 
+* Baseline accuracy is 90.4%
+* This is an improvement over the baseline and the CART model!
+
+Let us see how the models performs on the test data 
+
+### 6.5 Model Evaluation
+
+```{r}
+# Predicting on the test dataset
+test_predict.class_RF <- predict(rf_model2, test, type = "class") # Predicted Classes
+test_predict.score_RF <- predict(rf_model2, test, type = 'prob') # Predicted Probabilities
+
+# Create confusion matrix for test data predictions
+tab.test_RF = table(test$Personal_Loan, test_predict.class_RF)
+tab.test_RF
+
+# Accuracy on test data
+accuracy.test_RF = sum(diag(tab.test_RF)) / sum(tab.test_RF)
+accuracy.test_RF
+```
+
+* The model has good performance on test data too.
+* An accuracy of 99.3% on train data and 98.1% on test data indicates that this is a good model, neither overfit nor underfit.
+* This model is an improvement on the baseline model and will help us classify the right customers who have a higher probability of purchasing the loan.
+
+### 6.6 Comparing Models
+
+```{r}
+Model_Name = c("Baseline", "CART", "Random Forest")
+Train_Accuracy_perc = c(90, accuracy.train1*100, accuracy.train_RF*100)
+Test_Accuracy_perc = c(90, accuracy.test1*100, accuracy.test_RF*100)
+output = data.frame(Model_Name, Train_Accuracy_perc, Test_Accuracy_perc)
+output
+```
+
+* Random Forest model is a good predictor model for classifying customers who will purchase the loan.
+* We will use rf_model2 as our final model.
+
+### Variable Importance Final Model
+
+```{r}
+varImpPlot(rf_model2, sort = TRUE)
+```
+
+* It is worth noting that the most important variables indicated by the final CART model and final Random forest model are very similar.
+* Random forest gives us a much improved model as compared to CART
+* The decision tree model gives high importance to a particular set of features. However, the random forest chooses features randomly during the training process. Therefore, it does not depend highly on any specific set of features. 
+* The random forest can generalize over the data in a better way. This randomized feature selection makes random forest much more accurate than a decision tree.
+
+For quick referencce: Variables actually used in CART tree construction-
+
+* Education         
+* Income  
+* Family_members           
+* CCAvg     
+* CD_Account    
+* Mortgage       
+* Experience          
+* Age
+
+## 7.Confusion Matrix
+
+We will compare all the 4 models that we created earlier - model1, model2, rf_model1, rf_model2
+
+Predict Attrition class and probability for all 4 models
+```{r}
+# Predict on test data using cart_model1
+model1_predict_class = predict(model1, test, type = 'class')
+model1_predict_score = predict(model1, test, type = 'prob')
+
+# Predict on test data using cart_model2
+model2_predict_class = predict(model2, test, type = 'class')
+model2_predict_score = predict(model2, test, type = 'prob')
+
+# Predict on test data using rf_model1
+rf_model1_predict_class = predict(rf_model1, test, type = 'class')
+rf_model1_predict_score = predict(rf_model1, test, type = 'prob')
+
+# Predict on test data using rf_model2
+rf_model2_predict_class = predict(rf_model2, test, type = 'class')
+rf_model2_predict_score = predict(rf_model2, test, type = 'prob')
+```
+
+```{r}
+# Create Confusion Matrix for all the four models
+conf_mat_model1 = table(test$Personal_Loan, model1_predict_class)
+conf_mat_model1
+
+conf_mat_model2 = table(test$Personal_Loan, model2_predict_class)
+conf_mat_model2
+
+conf_mat_rf_model1 = table(test$Personal_Loan, rf_model1_predict_class)
+conf_mat_rf_model1
+
+conf_mat_rf_model2 = table(test$Personal_Loan, rf_model2_predict_class)
+conf_mat_rf_model2
+```
+
+### 7.1 Accuracy
+
+```{r}
+# Accuracy of models on test data
+accuracy_model1 = sum(diag(conf_mat_model1)) / sum(conf_mat_model1)
+
+accuracy_model2 = sum(diag(conf_mat_model2)) / sum(conf_mat_model2)
+
+accuracy_rf_model1 = sum(diag(conf_mat_rf_model1)) / sum(conf_mat_rf_model1)
+
+accuracy_rf_model2 = sum(diag(conf_mat_rf_model2)) / sum(conf_mat_rf_model2)
+```
+
+### 7.2 Sensitivity / Recall
+
+```{r}
+# Sensitivity of models on test data
+sensitivity_model1 = conf_mat_model1[2,2] / sum(conf_mat_model1['1',])
+
+sensitivity_model2 = conf_mat_model2[2,2] / sum(conf_mat_model2['1',])
+
+sensitivity_rf_model1 = conf_mat_rf_model1[2,2] / sum(conf_mat_rf_model1['1',])
+
+sensitivity_rf_model2 = conf_mat_rf_model2[2,2] / sum(conf_mat_rf_model2['1',])
+```
+
+### 7.3 Specificity
+
+```{r}
+# Specificity of models on test data
+specificity_model1 = conf_mat_model1[1,1] / sum(conf_mat_model1['0',])
+
+specificity_model2 = conf_mat_model2[1,1] / sum(conf_mat_model2['0',])
+
+specificity_rf_model1 = conf_mat_rf_model1[1,1] / sum(conf_mat_rf_model1['0',])
+
+specificity_rf_model2 = conf_mat_rf_model2[1,1] / sum(conf_mat_rf_model2['0',])
+```
+
+### 7.4 Precision
+
+```{r}
+# Precision of models on test data
+precision_model1 = conf_mat_model1[2,2] / sum(conf_mat_model1[,'1'])
+
+precision_model2 = conf_mat_model2[2,2] / sum(conf_mat_model2[,'1'])
+
+precision_rf_model1 = conf_mat_rf_model1[2,2] / sum(conf_mat_rf_model1[,'1'])
+
+precision_rf_model2 = conf_mat_rf_model2[2,2] / sum(conf_mat_rf_model2[,'1'])
+```
+
+### 7.5 KS
+
+```{r}
+# Using library ROCR functions prediction and performance
+pred_model1 = prediction(model1_predict_score[, 2], test$Personal_Loan) 
+perf_model1 = performance(pred_model1,"tpr","fpr")
+ks_model1 = max(attr(perf_model1,'y.values')[[1]] - attr(perf_model1,'x.values')[[1]])
+
+pred_model2 = prediction(model2_predict_score[, 2], test$Personal_Loan) 
+perf_model2 = performance(pred_model2,"tpr","fpr")
+ks_model2 = max(attr(perf_model2,'y.values')[[1]] - attr(perf_model2,'x.values')[[1]])
+
+pred_rf_model1 = prediction(rf_model1_predict_score[, 2], test$Personal_Loan) 
+perf_rf_model1 = performance(pred_rf_model1,"tpr","fpr")
+ks_rf_model1 = max(attr(perf_rf_model1,'y.values')[[1]] - attr(perf_rf_model1,'x.values')[[1]])
+
+pred_rf_model2 = prediction(rf_model2_predict_score[, 2], test$Personal_Loan) 
+perf_rf_model2 = performance(pred_rf_model2,"tpr","fpr")
+ks_rf_model2 = max(attr(perf_rf_model2,'y.values')[[1]] - attr(perf_rf_model2,'x.values')[[1]])
+```
+
+### 7.6 AUC
+
+```{r}
+# Using library ROCR
+auc_model1 = performance(pred_model1, measure = "auc")
+auc_model1 = auc_model1@y.values[[1]]
+
+auc_model2 = performance(pred_model2, measure = "auc")
+auc_model2 = auc_model2@y.values[[1]]
+
+auc_rf_model1 = performance(pred_rf_model1, measure = "auc")
+auc_rf_model1 = auc_rf_model1@y.values[[1]]
+
+auc_rf_model2 = performance(pred_rf_model2, measure = "auc")
+auc_rf_model2 = auc_rf_model2@y.values[[1]]
+```
+
+### 7.7 Gini
+```{r}
+# Using library ineq 
+gini_model1 = ineq(model1_predict_score[, 2],"gini")
+
+gini_model2 = ineq(model2_predict_score[, 2],"gini")
+
+gini_rf_model1 = ineq(rf_model1_predict_score[, 2],"gini")
+
+gini_rf_model2 = ineq(rf_model2_predict_score[, 2],"gini")
+```
+
+### 7.8 Concordance - Discordance
+
+```{r}
+concordance_model1 = Concordance(actuals = ifelse(test$Personal_Loan == '1', 1,0), predictedScores = ifelse(model1_predict_class == '1', 1,0))
+
+concordance_model2 = Concordance(actuals = ifelse(test$Personal_Loan == '1', 1,0), predictedScores = ifelse(model2_predict_class == '1', 1,0))
+
+concordance_rf_model1 = Concordance(actuals = ifelse(test$Personal_Loan == '1', 1,0), predictedScores = ifelse(rf_model1_predict_class == '1', 1,0))
+
+concordance_rf_model2 = Concordance(actuals = ifelse(test$Personal_Loan == '1', 1,0), predictedScores = ifelse(rf_model2_predict_class == '1', 1,0))
+```
+
+### 7.9 Comparing models
+
+```{r}
+
+model1_metrics = c(accuracy_model1, sensitivity_model1, specificity_model1, precision_model1, ks_model1, auc_model1, gini_model1, concordance_model1$Concordance)
+
+model2_metrics = c(accuracy_model2, sensitivity_model2, specificity_model2, precision_model2, ks_model2, auc_model2, gini_model2, concordance_model2$Concordance)
+
+rf_model1_metrics = c(accuracy_rf_model1, sensitivity_rf_model1, specificity_rf_model1, precision_rf_model1, ks_rf_model1, auc_rf_model1, gini_rf_model1, concordance_rf_model1$Concordance)
+
+rf_model2_metrics = c(accuracy_rf_model2, sensitivity_rf_model2, specificity_rf_model2, precision_rf_model2, ks_rf_model2, auc_rf_model2, gini_rf_model2, concordance_rf_model2$Concordance)
+
+comparison_table = data.frame(model1_metrics, model2_metrics, rf_model1_metrics, rf_model2_metrics)
+
+rownames(comparison_table) = c("Accuracy", "Sensitivity", "Specificity", "Precision", "KS", "Auc", "Gini", "Concordance")
+
+comparison_table
+```
+
+### 7.10 Conclusion
+
+* Accuracy is the percentage of correct predictions for the test data. Based on this, the Random Forest model2 (rf_model2) is the most accurate.
+
+* Sensitivity is the proportion of total positives that were correctly identified. Based on this, the Random Forest model2 (rf_model2) is the most sensitivty. This model will help the bank to better predict susceptible customers willing to take a personal loan.  
+
+* Specificity is the proportion of total negatives that were correctly identified. Based on this, the CART model2 (model2) is the most specific.
+
+* Precision is the fraction of relevant observations (true positives) among all of the observations which were predicted to belong in a certain class. Based on this, the CART model2 (model2) is the most precise.
+
+* KS is used for decisions like how many to target - where we are more concerned about the predictive power of our best groups. Here, a higher KS is better and based on that, the Random Forest model1 and model2 (rf_model1 and rf_model2) is better.
+
+* Area under the curve (AUC) is a measure of how good a model is, indicating a higher percentage is better. Based on this, the Random Forest model2 (rf_model2) is better.
+
+* Gini is measured in values between 0 and 1, where a score of 1 means that the model is 100% accurate in predicting the outcome and vice versa. Based on this, the Random Forest model2 (rf_model2) is better.
+
+* Concordance is also used to access the model’s predictive power. Based on this, the Random Forest model2 (rf_model2) is better.
+
+* Based on the confusion matrix, the Random Forest model2 (rf_model2) does a better job in predicting the probability of a customer taking a loan from Thera Bank since the Sensitvity of the Random Forest model is 84.0% and accuracy is 98.2%.
+
+* Based on KS, AUC, Gini and Concordance the Random Forest model2 (rf_model2) does a better job in predicting the probability of a customer taking a loan from Thera Bank with a score of 97.8%, 99.8%, 90.3% and 83.8% respectively.
+
+* From the above, we can see that the Random Forest model2 (rf_model2) is better in most parameters in comparison to model1, model2 and rf_model2. As a result, the rf_model2 performed the best.
+
+## 8. Appendix A – Source Code
+
+```
+#======================================================================= 
+# 
+# Exploratory Data Analysis - CardioGoodFitness 
+# 
+#=======================================================================
+
+# Environment set up and data import
+
+# Invoking libraries
+library(readxl) # To import excel files
+library(ggplot2) # To create plots
+library(corrplot) # To plot correlation plot between numerical variables
+library(dplyr) # To manipulate dataset
+library(gridExtra) # To plot multiple ggplot graphs in a grid
+library(DataExplorer) # visual exploration of data
+library(mice) # Multivariate Imputation via Chained Equations; takes care of uncertainty in missing values
+library(cluster)
+library(factoextra) # extract and visualize the results of multivariate data analysis
+library(NbClust) # to find optimal number of clusters
+library(caTools) # Split Data into Test and Train Set
+library(rpart) # To build CART decision tree
+library(rattle) # To visualise decision tree
+library(randomForest) # To build a Random Forest
+library(ROCR) # To visualise the performance classifiers
+library(ineq) # To calculate Gini
+library(InformationValue) # For Concordance-Discordance
+library(knitr) # Necessary to generate source codes from a .Rmd File
+library(markdown) # To convert to HTML
+library(rmarkdown) # To convret analyses into high quality documents
+
+# Set working directory 
+setwd("C:/Users/egwuc/Desktop/PGP-DSBA-UT Austin/Machine Learning/Week 5 - Project/")
+
+# Read input file
+thera_bank <- read_excel("Thera Bank_Personal_Loan_Modelling-dataset-1.xlsx", sheet = 2)
+
+# Global options settings
+options(scipen = 999) # turn off scientific notation like 1e+06
+
+# Check dimension of dataset 
+dim(thera_bank)
+
+# Check first 6 rows(observations) of dataset
+head(thera_bank)
+tail(thera_bank)
+
+# Convert column names to appropriate column names
+colnames(thera_bank) <- c("ID", "Age", "Experience", "Income", "ZIP_Code", "Family_members", "CCAvg", "Education", "Mortgage",
+                          "Personal_Loan", "Securities_Account", "CD_Account", "Online", "CreditCard")
+
+# Check structure of dataset
+str(thera_bank)
+
+# Change personal_loan to factor variable
+thera_bank$Personal_Loan <- as.factor(thera_bank$Personal_Loan)
+
+# Get summary of dataset
+summary(thera_bank)
+
+# Dropping ID and Zip Code column
+thera_bank <- thera_bank[, -1]
+thera_bank <- thera_bank[, -4]
+
+# View the dataset 
+View(thera_bank)
+
+# Filter out values less than 0 in Experience
+filter(thera_bank, Experience < 0)
+
+# Replace values less than 0 in Experience with 0
+thera_bank$Experience <- replace(thera_bank$Experience, thera_bank$Experience<0, 0)
+
+# Check if any values in less than 0 in Experience
+filter(thera_bank, Experience < 0)
+
+# How many missing vaues do we have?
+sum(is.na(thera_bank)) 
+
+# What columns contain missing values?
+colSums(is.na(thera_bank))
+
+# Use functions and algorithms to impute the missing values
+data1 <- thera_bank
+sum(is.na(data1))
+md.pattern(data1)
+init.impute = mice(data1, m = 5, method = "pmm", seed = 1000)
+thera_bank = complete(init.impute, 2)
+md.pattern(thera_bank)
+sum(is.na(thera_bank))
+
+# Distribution of the dependent variable
+prop.table(table(thera_bank$Personal_Loan))
+
+plot_histogram_n_boxplot = function(variable, variableNameString, binw){
+  
+  a = ggplot(data = thera_bank, aes(x= variable)) +
+    labs(x = variableNameString,y ='count')+
+    geom_histogram(fill = 'green',col = 'white', binwidth = binw) +
+    geom_vline(aes(xintercept = mean(variable)),
+               color = "black", linetype = "dashed", size = 0.5)
+  
+  b = ggplot(data = thera_bank, aes('',variable))+ 
+    geom_boxplot(outlier.colour = 'red',col = 'red', outlier.shape = 19)+
+    labs(x = '', y = variableNameString) + coord_flip()
+  grid.arrange(a,b,ncol = 2)
+}
+
+plot_histogram_n_boxplot(thera_bank$Age, 'Age', 2)
+
+plot_histogram_n_boxplot(thera_bank$Experience, 'Experience', 2)
+
+plot_histogram_n_boxplot(thera_bank$Income, 'Income', 10)
+
+plot_histogram_n_boxplot(thera_bank$Family_members, 'Family Members', 1)
+
+plot_histogram_n_boxplot(thera_bank$CCAvg, 'CCAvg', 1)
+
+plot_histogram_n_boxplot(thera_bank$Education, 'Education', 1)
+
+plot_histogram_n_boxplot(thera_bank$Mortgage, 'Mortgage', 100)
+
+plot_histogram_n_boxplot(thera_bank$Securities_Account, 'Securities Account', 1)
+
+plot_histogram_n_boxplot(thera_bank$CD_Account, 'CD Account', 1)
+
+plot_histogram_n_boxplot(thera_bank$Online, 'Online', 1)
+
+plot_histogram_n_boxplot(thera_bank$CreditCard, 'Credit Card', 1)
+
+# Function to draw percent stacked barchart to see the effect of independent variables
+# on the probability of personal loan using ggplot
+plot_stacked_barchart = function(variable, variableNameString){
+  ggplot(thera_bank, aes(fill = Personal_Loan, x = variable)) + 
+    geom_bar(position="fill")+
+    labs(title = variableNameString, y = '', x = '')+
+    scale_fill_manual(values=c("#0073C2FF", "#EFC000FF"))
+        
+}
+
+plot_stacked_barchart(thera_bank$Age, 'Age')
+
+plot_stacked_barchart(thera_bank$Experience, 'Experience')
+
+plot_stacked_barchart(thera_bank$Income, 'Income')
+
+plot_stacked_barchart(thera_bank$Family_members, 'Family Members')
+
+plot_stacked_barchart(thera_bank$Education, 'Education')
+
+plot_stacked_barchart(thera_bank$Securities_Account, 'Securities Account')
+
+plot_stacked_barchart(thera_bank$CD_Account, 'CD Account')
+
+plot_stacked_barchart(thera_bank$Online, 'Online')
+
+plot_stacked_barchart(thera_bank$CreditCard, 'Credit Card')
+
+# Numeric variables in the data
+num_vars = sapply(thera_bank, is.numeric)
+
+# Correlation Plot
+corrplot(cor(thera_bank[,num_vars]), method = 'number')
+
+# Scale the dataset to reduce the influence from variables with high values
+data <- thera_bank
+
+# Change Family_members, Education, Securities_Account, CD_Account, Online and CreditCard to factor variable
+thera_bank$Family_members <- as.factor(thera_bank$Family_members)
+thera_bank$Education <- as.factor(thera_bank$Education)
+thera_bank$Securities_Account <- as.factor(thera_bank$Securities_Account)
+thera_bank$CD_Account <- as.factor(thera_bank$CD_Account)
+thera_bank$Online <- as.factor(thera_bank$Online)
+thera_bank$CreditCard <- as.factor(thera_bank$CreditCard)
+
+str(data)
+view(data)
+
+thera_bank.scaled <- scale(data[, -c(4, 6, 8, 9, 10, 11, 12)])
+
+# Determine the optimum number of clusters (find optimal k)
+seed <- 1000
+set.seed(seed) # kmeans uses a randomized starting point for cluster centroids
+clust2 = kmeans(thera_bank.scaled, centers = 2, nstart = 5)
+print(clust2)
+
+# Visualise the cluster
+clusplot(thera_bank.scaled, clust2$cluster, 
+         color=TRUE, shade=TRUE, labels=2, lines=1)
+
+# Create clusters for k=3, k=4 and k=5 for comparative analysis
+clust3 <- kmeans(thera_bank.scaled, centers = 3, nstart = 5)
+clust4 <- kmeans(thera_bank.scaled, centers = 4, nstart = 5)
+clust5 <- kmeans(thera_bank.scaled, centers = 5, nstart = 5)
+
+# Visualise clusters in 2 dimensions
+k_clust_viz_2 = fviz_cluster(list(data = thera_bank.scaled,
+                                  cluster = clust2$cluster)) + 
+  ggtitle("k = 2")
+k_clust_viz_3 = fviz_cluster(list(data = thera_bank.scaled,
+                                  cluster = clust3$cluster)) + 
+  ggtitle("k = 3")
+k_clust_viz_4 = fviz_cluster(list(data = thera_bank.scaled,
+                                  cluster = clust4$cluster)) + 
+  ggtitle("k = 4")
+k_clust_viz_5 = fviz_cluster(list(data = thera_bank.scaled,
+                                  cluster = clust5$cluster)) + 
+  ggtitle("k = 5")
+
+# Visualise all 4 clustering plots together
+grid.arrange(k_clust_viz_2, k_clust_viz_3, k_clust_viz_4, k_clust_viz_5, nrow = 2)
+
+# To find the optimal numbner of clusters. Lets try K = 1 to 5 and for each plot the "sum of Within cluster sum of squares".
+totWss <- rep(0,5)
+for(k in 1:5){
+  set.seed(seed)
+  clust <- kmeans(thera_bank.scaled, centers = k, nstart = 5)
+  totWss[k] <- clust$tot.withinss
+}
+print(totWss)
+plot(c(1:5), totWss, type="b", xlab="Number of Clusters",
+       ylab="sum of 'Within groups sum of squares'")
+
+set.seed(seed) 
+nc <- NbClust(thera_bank.scaled, min.nc = 2, max.nc = 5, method="kmeans")
+
+table(nc$Best.n[1,])
+
+# Adding the cluster numbers back to the dataset
+data$Clusters = clust3$cluster
+
+# Aggregate all columns except column 8 for each cluster by their means
+custProfile = aggregate(data[, -c(4, 6, 8, 9, 10, 11, 12)],list(data$Cluster),FUN="mean")
+print(custProfile)
+
+set.seed(seed) # To ensure reproducibility
+split <- sample.split(thera_bank$Personal_Loan, SplitRatio = 0.7)
+train <- subset(thera_bank, split == TRUE)
+test <- subset(thera_bank, split == FALSE)
+
+nrow(train)
+nrow(test)
+
+# Check that the distribution of the dependent variable is similar in train and test sets
+prop.table(table(thera_bank$Personal_Loan))
+prop.table(table(thera_bank$Personal_Loan))
+prop.table(table(thera_bank$Personal_Loan))
+
+# Setting the control parameters (to control the growth of the tree)
+# Set the control parameters very low to let the tree grow deep
+
+r.ctrl = rpart.control(minsplit = 50, minbucket = 10, cp = 0, xval = 10)
+
+# Building the CART model
+
+# formula - response variable~predictor variables  
+# data - dataset
+# method - "class" - for classification, "anova" for regression
+# control - tree control parameters
+
+model1 <- rpart(formula = Personal_Loan ~ ., data = train, method = "class", control = r.ctrl)
+model1
+
+# Displaying the decision tree
+fancyRpartPlot(model1)
+
+# The cost complexity table can be obtained using the printcp or plotcp functions
+printcp(model1)
+plotcp(model1)
+
+model2 = prune(model1, cp= 0.021, "CP")
+printcp(model2)
+model2
+
+#Displaying the decision tree
+fancyRpartPlot(model2)
+
+# Variable importance is generally computed based on the corresponding reduction of predictive accuracy 
+# when the predictor of interest is removed.
+model1$variable.importance
+
+# Variable importance is generally computed based on the corresponding reduction of predictive accuracy 
+# when the predictor of interest is removed.
+model2$variable.importance
+
+# Predicting on the train dataset
+train_predict.class1 <- predict(model1, train, type="class") # Predicted Classes
+train_predict.score1 <- predict(model1, train) # Predicted Probabilities
+
+# Create confusion matrix for train data predictions
+tab.train1 = table(train$Personal_Loan, train_predict.class1)
+tab.train1
+
+# Accuracy on train data
+accuracy.train1 = sum(diag(tab.train1)) / sum(tab.train1)
+accuracy.train1
+
+# Predicting on the train dataset
+train_predict.class2 <- predict(model2, train, type="class") # Predicted Classes
+train_predict.score2 <- predict(model2, train) # Predicted Probabilities
+
+# Create confusion matrix for train data predictions
+tab.train2 = table(train$Personal_Loan, train_predict.class2)
+tab.train2
+
+# Accuracy on train data
+accuracy.train2 = sum(diag(tab.train2)) / sum(tab.train2)
+accuracy.train2
+
+# Predicting on the test dataset using MODEL 1
+test_predict.class1 <- predict(model1, test, type="class") # Predicted Classes
+test_predict.score1 <- predict(model1, test) # Predicted Probabilities
+
+# Create confusion matrix for test data predictions (using MODEL 1)
+tab.test1 = table(test$Personal_Loan, test_predict.class1)
+tab.test1
+
+# Accuracy on train data (MODEL 1 predictions)
+accuracy.test1 = sum(diag(tab.test1)) / sum(tab.test1)
+accuracy.test1
+
+# Predicting on the test dataset using MODEL 2
+test_predict.class2 <- predict(model2, test, type="class") # Predicted Classes
+test_predict.score2 <- predict(model2, test) # Predicted Probabilities
+
+# Create confusion matrix for test data predictions (using MODEL 2)
+tab.test2 = table(test$Personal_Loan, test_predict.class2)
+tab.test2
+
+# Accuracy on train data (MODEL 2 predictions)
+accuracy.test2 = sum(diag(tab.test2)) / sum(tab.test2)
+accuracy.test2
+
+Model_Name = c("Baseline", "Model1", "Model2")
+Train_Accuracy_perc = c(90, accuracy.train1*100, accuracy.train2*100)
+Test_Accuracy_perc = c(90, accuracy.test1*100, accuracy.test2*100)
+output = data.frame(Model_Name,Train_Accuracy_perc,Test_Accuracy_perc)
+output
+
+set.seed(seed)
+# Formula - response variable ~ predictor variables
+# To build a classification random forest the response variable should be converted to a factor if it isn't already a factor
+# data -  dataset to train the model on
+## Random Forest hyperparameters
+# ntree - Total number of trees are to be constructed
+# mtry - number of variables tried at each split
+# importance - Set TRUE to assess variable importance
+
+rf_model1 = randomForest(
+  Personal_Loan ~ .,
+  data = train,
+  ntree = 501,
+  mtry = 5,
+  nodesize = 10,
+  importance = TRUE
+  )
+
+print(rf_model1)
+
+plot(rf_model1, main="")
+legend("topright", c("OOB", "0", "1"), text.col=1:6, lty=1:3, col=1:3)
+title(main="Error Rates Random Forest Thera_Bank")
+
+importance(rf_model1)
+
+# Check the column number of the response variable
+names(train)
+
+set.seed(seed) # To ensure reproducibility
+
+rf_model2 = tuneRF(x = train[, -8], # matrix or data frame of predictor/independent variables
+                  y = train$Personal_Loan, # response vector (factor for classification, numeric for regression)
+                  mtrystart = 5, # starting value of mtry
+                  stepfactor=1.5, # at each iteration, mtry is inflated (or deflated) by this value
+                  ntree=51, # number of trees built for each mtry value
+                  improve=0.0001, # the (relative) improvement in OOB error must be by this much for the search to continue
+                  nodesize=10, # Minimum size of terminal nodes
+                  trace=TRUE, # prints the progress of the search
+                  plot=TRUE, # to get the plot of the OOB error as function of mtr
+                  doBest=TRUE, # return a forest using the optimal mtry found
+                  importance=TRUE # 
+                  )
+
+# Predicting on the train dataset
+train_predict.class_RF <- predict(rf_model2, train, type = "class") # Predicted Classes
+train_predict.score_RF <- predict(rf_model2, train, type = 'prob') # Predicted Probabilities
+
+# Create confusion matrix for train data predictions
+tab.train_RF = table(train$Personal_Loan, train_predict.class_RF)
+tab.train_RF
+
+# Accuracy on train data
+accuracy.train_RF = sum(diag(tab.train_RF)) / sum(tab.train_RF)
+accuracy.train_RF
+
+# Predicting on the test dataset
+test_predict.class_RF <- predict(rf_model2, test, type = "class") # Predicted Classes
+test_predict.score_RF <- predict(rf_model2, test, type = 'prob') # Predicted Probabilities
+
+# Create confusion matrix for test data predictions
+tab.test_RF = table(test$Personal_Loan, test_predict.class_RF)
+tab.test_RF
+
+# Accuracy on test data
+accuracy.test_RF = sum(diag(tab.test_RF)) / sum(tab.test_RF)
+accuracy.test_RF
+
+Model_Name = c("Baseline", "CART", "Random Forest")
+Train_Accuracy_perc = c(90, accuracy.train1*100, accuracy.train_RF*100)
+Test_Accuracy_perc = c(90, accuracy.test1*100, accuracy.test_RF*100)
+output = data.frame(Model_Name, Train_Accuracy_perc, Test_Accuracy_perc)
+output
+
+varImpPlot(rf_model2, sort = TRUE)
+
+# Predict on test data using cart_model1
+model1_predict_class = predict(model1, test, type = 'class')
+model1_predict_score = predict(model1, test, type = 'prob')
+
+# Predict on test data using cart_model2
+model2_predict_class = predict(model2, test, type = 'class')
+model2_predict_score = predict(model2, test, type = 'prob')
+
+# Predict on test data using rf_model1
+rf_model1_predict_class = predict(rf_model1, test, type = 'class')
+rf_model1_predict_score = predict(rf_model1, test, type = 'prob')
+
+# Predict on test data using rf_model2
+rf_model2_predict_class = predict(rf_model2, test, type = 'class')
+rf_model2_predict_score = predict(rf_model2, test, type = 'prob')
+
+# Create Confusion Matrix for all the four models
+conf_mat_model1 = table(test$Personal_Loan, model1_predict_class)
+conf_mat_model1
+
+conf_mat_model2 = table(test$Personal_Loan, model2_predict_class)
+conf_mat_model2
+
+conf_mat_rf_model1 = table(test$Personal_Loan, rf_model1_predict_class)
+conf_mat_rf_model1
+
+conf_mat_rf_model2 = table(test$Personal_Loan, rf_model2_predict_class)
+conf_mat_rf_model2
+
+# Accuracy of models on test data
+accuracy_model1 = sum(diag(conf_mat_model1)) / sum(conf_mat_model1)
+
+accuracy_model2 = sum(diag(conf_mat_model2)) / sum(conf_mat_model2)
+
+accuracy_rf_model1 = sum(diag(conf_mat_rf_model1)) / sum(conf_mat_rf_model1)
+
+accuracy_rf_model2 = sum(diag(conf_mat_rf_model2)) / sum(conf_mat_rf_model2)
+
+# Sensitivity of models on test data
+sensitivity_model1 = conf_mat_model1[2,2] / sum(conf_mat_model1['1',])
+
+sensitivity_model2 = conf_mat_model2[2,2] / sum(conf_mat_model2['1',])
+
+sensitivity_rf_model1 = conf_mat_rf_model1[2,2] / sum(conf_mat_rf_model1['1',])
+
+sensitivity_rf_model2 = conf_mat_rf_model2[2,2] / sum(conf_mat_rf_model2['1',])
+
+# Specificity of models on test data
+specificity_model1 = conf_mat_model1[1,1] / sum(conf_mat_model1['0',])
+
+specificity_model2 = conf_mat_model2[1,1] / sum(conf_mat_model2['0',])
+
+specificity_rf_model1 = conf_mat_rf_model1[1,1] / sum(conf_mat_rf_model1['0',])
+
+specificity_rf_model2 = conf_mat_rf_model2[1,1] / sum(conf_mat_rf_model2['0',])
+
+# Precision of models on test data
+precision_model1 = conf_mat_model1[2,2] / sum(conf_mat_model1[,'1'])
+
+precision_model2 = conf_mat_model2[2,2] / sum(conf_mat_model2[,'1'])
+
+precision_rf_model1 = conf_mat_rf_model1[2,2] / sum(conf_mat_rf_model1[,'1'])
+
+precision_rf_model2 = conf_mat_rf_model2[2,2] / sum(conf_mat_rf_model2[,'1'])
+
+# Using library ROCR functions prediction and performance
+pred_model1 = prediction(model1_predict_score[, 2], test$Personal_Loan) 
+perf_model1 = performance(pred_model1,"tpr","fpr")
+ks_model1 = max(attr(perf_model1,'y.values')[[1]] - attr(perf_model1,'x.values')[[1]])
+
+pred_model2 = prediction(model2_predict_score[, 2], test$Personal_Loan) 
+perf_model2 = performance(pred_model2,"tpr","fpr")
+ks_model2 = max(attr(perf_model2,'y.values')[[1]] - attr(perf_model2,'x.values')[[1]])
+
+pred_rf_model1 = prediction(rf_model1_predict_score[, 2], test$Personal_Loan) 
+perf_rf_model1 = performance(pred_rf_model1,"tpr","fpr")
+ks_rf_model1 = max(attr(perf_rf_model1,'y.values')[[1]] - attr(perf_rf_model1,'x.values')[[1]])
+
+pred_rf_model2 = prediction(rf_model2_predict_score[, 2], test$Personal_Loan) 
+perf_rf_model2 = performance(pred_rf_model2,"tpr","fpr")
+ks_rf_model2 = max(attr(perf_rf_model2,'y.values')[[1]] - attr(perf_rf_model2,'x.values')[[1]])
+
+# Using library ROCR
+auc_model1 = performance(pred_model1, measure = "auc")
+auc_model1 = auc_model1@y.values[[1]]
+
+auc_model2 = performance(pred_model2, measure = "auc")
+auc_model2 = auc_model2@y.values[[1]]
+
+auc_rf_model1 = performance(pred_rf_model1, measure = "auc")
+auc_rf_model1 = auc_rf_model1@y.values[[1]]
+
+auc_rf_model2 = performance(pred_rf_model2, measure = "auc")
+auc_rf_model2 = auc_rf_model2@y.values[[1]]
+
+# Using library ineq 
+gini_model1 = ineq(model1_predict_score[, 2],"gini")
+
+gini_model2 = ineq(model2_predict_score[, 2],"gini")
+
+gini_rf_model1 = ineq(rf_model1_predict_score[, 2],"gini")
+
+gini_rf_model2 = ineq(rf_model2_predict_score[, 2],"gini")
+
+concordance_model1 = Concordance(actuals = ifelse(test$Personal_Loan == '1', 1,0), predictedScores = ifelse(model1_predict_class == '1', 1,0))
+
+concordance_model2 = Concordance(actuals = ifelse(test$Personal_Loan == '1', 1,0), predictedScores = ifelse(model2_predict_class == '1', 1,0))
+
+concordance_rf_model1 = Concordance(actuals = ifelse(test$Personal_Loan == '1', 1,0), predictedScores = ifelse(rf_model1_predict_class == '1', 1,0))
+
+concordance_rf_model2 = Concordance(actuals = ifelse(test$Personal_Loan == '1', 1,0), predictedScores = ifelse(rf_model2_predict_class == '1', 1,0))
+
+
+model1_metrics = c(accuracy_model1, sensitivity_model1, specificity_model1, precision_model1, ks_model1, auc_model1, gini_model1, concordance_model1$Concordance)
+
+model2_metrics = c(accuracy_model2, sensitivity_model2, specificity_model2, precision_model2, ks_model2, auc_model2, gini_model2, concordance_model2$Concordance)
+
+rf_model1_metrics = c(accuracy_rf_model1, sensitivity_rf_model1, specificity_rf_model1, precision_rf_model1, ks_rf_model1, auc_rf_model1, gini_rf_model1, concordance_rf_model1$Concordance)
+
+rf_model2_metrics = c(accuracy_rf_model2, sensitivity_rf_model2, specificity_rf_model2, precision_rf_model2, ks_rf_model2, auc_rf_model2, gini_rf_model2, concordance_rf_model2$Concordance)
+
+comparison_table = data.frame(model1_metrics, model2_metrics, rf_model1_metrics, rf_model2_metrics)
+
+rownames(comparison_table) = c("Accuracy", "Sensitivity", "Specificity", "Precision", "KS", "Auc", "Gini", "Concordance")
+
+comparison_table
+
+#======================================================================= 
+# 
+# T H E - E N D 
+# 
+#=======================================================================
+
+# Generate the .R file from this .Rmd to hold the source code 
+
+purl("Thera Bank Project.Rmd", documentation = 0)
+```
+
+```{r echo = FALSE}
+#======================================================================= 
+# 
+# T H E - E N D 
+# 
+#=======================================================================
+```
+
+
+*******************************************************************************
+
+Generate .R file from this Rmd. 
+The .R will contain only the R source code.
+
+```{r message = FALSE, results = 'hide'}
+# Generate the .R file from this .Rmd to hold the source code 
+
+purl("Thera Bank Project.Rmd", documentation = 0)
+```
+
+To create word or pdf report -> click on Knit in the toolbar above, select knit to pdf.
