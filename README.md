@@ -17,27 +17,27 @@ Thera Bank has 5,000 deposit-only customers, of whom only 480 (9.6 %) converted 
 ---
 
 ## 🗂️ Repository Structure
-
-- ├── data/
-- │ └── Thera_Bank_Personal_Loan_Modelling-dataset-1.xlsx # Raw customer dataset
-- │
-- ├── scripts/
-- │ ├── 01_eda.R # Exploratory Data Analysis & cleaning
-- │ ├── 02_clustering.R # K-Means customer segmentation
-- │ ├── 03_cart_model.R # CART model development & tuning
-- │ └── 04_random_forest.R # Random Forest model & evaluation
-- │
-- ├── reports/
-- │ ├── Thera-Bank-Project.Rmd # RMarkdown source
-- │ └── Thera-Bank-Project.pdf # Knit HTML/PDF report
-- │
-- ├── outputs/ # Generated plots, tables, model objects
-- │ ├── cluster_profiles.csv
-- │ ├── cart_tree.png
-- │ └── rf_variable_importance.png
-- │
-- ├── README.md # This file
-
+```bash
+├── data/
+│ └── Thera_Bank_Personal_Loan_Modelling-dataset-1.xlsx # Raw customer dataset
+│
+├── scripts/
+│ ├── 01_eda.R # Exploratory Data Analysis & cleaning
+│ ├── 02_clustering.R # K-Means customer segmentation
+│ ├── 03_cart_model.R # CART model development & tuning
+│ └── 04_random_forest.R # Random Forest model & evaluation
+│
+├── reports/
+│ ├── Thera-Bank-Project.Rmd # RMarkdown source
+│ └── Thera-Bank-Project.pdf # Knit HTML/PDF report
+│
+├── outputs/ # Generated plots, tables, model objects
+│ ├── cluster_profiles.csv
+│ ├── cart_tree.png
+│ └── rf_variable_importance.png
+│
+├── README.md # This file
+```
 ---
 
 ## 🛠️ Setup & Dependencies
